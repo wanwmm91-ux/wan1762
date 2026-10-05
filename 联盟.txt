@@ -1,0 +1,532 @@
+local P = game:GetService("Players").LocalPlayer
+local RS = game:GetService("ReplicatedStorage")
+local UIS = game:GetService("UserInputService")
+
+local AUTO_START = true
+local HOLD_TIME = 1.0
+local HIT_GAP = 0.05
+local TARGET_POS = Vector3.new(-6828.9, 27.5, 1044.1)
+
+for _, v in ipairs(P.PlayerGui:GetChildren()) do
+    if v.Name == "FishAuto" then v:Destroy() end
+end
+
+local sg = Instance.new("ScreenGui")
+sg.Name = "FishAuto"
+sg.ResetOnSpawn = false
+sg.IgnoreGuiInset = true
+sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+sg.Parent = P:WaitForChild("PlayerGui")
+
+-- 主开关按钮
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Name = "wan1762"
+toggleBtn.Size = UDim2.new(0, 90, 0, 36)
+toggleBtn.Position = UDim2.new(0.75, 0, 0.35, 0)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(30, 35, 48)
+toggleBtn.Text = "wan1762"
+toggleBtn.TextColor3 = Color3.fromRGB(190, 210, 240)
+toggleBtn.TextSize = 13
+toggleBtn.Font = Enum.Font.GothamBold
+toggleBtn.AutoButtonColor = false
+toggleBtn.ZIndex = 10
+toggleBtn.Parent = sg
+Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 8)
+
+local toggleStroke = Instance.new("UIStroke", toggleBtn)
+toggleStroke.Color = Color3.fromRGB(70, 90, 130)
+toggleStroke.Thickness = 1
+toggleStroke.Transparency = 0.3
+
+local toggleGrad = Instance.new("UIGradient")
+toggleGrad.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(45, 55, 75)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(25, 30, 42)),
+}
+toggleGrad.Rotation = 90
+toggleGrad.Parent = toggleBtn
+
+-- 面板
+local card = Instance.new("Frame")
+card.Size = UDim2.new(0, 200, 0, 198)
+card.Position = UDim2.new(0.7, 0, 0.3, 0)
+card.BackgroundColor3 = Color3.fromRGB(25, 28, 35)
+card.BorderSizePixel = 0
+card.Visible = false
+card.ZIndex = 5
+card.Parent = sg
+Instance.new("UICorner", card).CornerRadius = UDim.new(0, 14)
+
+local cardGrad = Instance.new("UIGradient")
+cardGrad.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(38, 44, 58)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 22, 30)),
+}
+cardGrad.Rotation = 135
+cardGrad.Parent = card
+
+local cardStroke = Instance.new("UIStroke", card)
+cardStroke.Color = Color3.fromRGB(70, 90, 130)
+cardStroke.Thickness = 1
+cardStroke.Transparency = 0.4
+
+local title = Instance.new("TextButton")
+title.Size = UDim2.new(1, 0, 0, 28)
+title.BackgroundTransparency = 1
+title.Text = "   自动钓鱼"
+title.TextColor3 = Color3.fromRGB(190, 210, 240)
+title.TextSize = 14
+title.Font = Enum.Font.GothamBold
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.AutoButtonColor = false
+title.ZIndex = 6
+title.Parent = card
+
+local dot = Instance.new("Frame")
+dot.Size = UDim2.new(0, 8, 0, 8)
+dot.Position = UDim2.new(1, -20, 0, 10)
+dot.BackgroundColor3 = Color3.fromRGB(100, 100, 120)
+dot.BorderSizePixel = 0
+dot.ZIndex = 6
+dot.Parent = card
+Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
+
+local statusText = Instance.new("TextLabel")
+statusText.Size = UDim2.new(1, -20, 0, 14)
+statusText.Position = UDim2.new(0, 10, 0, 30)
+statusText.BackgroundTransparency = 1
+statusText.Text = "已停止"
+statusText.TextColor3 = Color3.fromRGB(140, 150, 170)
+statusText.TextSize = 11
+statusText.Font = Enum.Font.Gotham
+statusText.TextXAlignment = Enum.TextXAlignment.Left
+statusText.ZIndex = 6
+statusText.Parent = card
+
+local btn = Instance.new("TextButton")
+btn.Size = UDim2.new(1, -20, 0, 36)
+btn.Position = UDim2.new(0, 10, 0, 50)
+btn.BackgroundColor3 = Color3.fromRGB(60, 80, 130)
+btn.Text = "开始"
+btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+btn.TextSize = 14
+btn.Font = Enum.Font.GothamBold
+btn.AutoButtonColor = false
+btn.ZIndex = 6
+btn.Parent = card
+Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+
+local btnGrad = Instance.new("UIGradient")
+btnGrad.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(85, 130, 200)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(55, 85, 140)),
+}
+btnGrad.Rotation = 90
+btnGrad.Parent = btn
+
+local afkBtn = Instance.new("TextButton")
+afkBtn.Size = UDim2.new(0.48, 0, 0, 30)
+afkBtn.Position = UDim2.new(0, 10, 0, 92)
+afkBtn.BackgroundColor3 = Color3.fromRGB(45, 60, 90)
+afkBtn.Text = "开启 AFK"
+afkBtn.TextColor3 = Color3.fromRGB(220, 230, 250)
+afkBtn.TextSize = 11
+afkBtn.Font = Enum.Font.GothamBold
+afkBtn.AutoButtonColor = false
+afkBtn.ZIndex = 6
+afkBtn.Parent = card
+Instance.new("UICorner", afkBtn).CornerRadius = UDim.new(0, 6)
+
+local afkGrad = Instance.new("UIGradient")
+afkGrad.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(70, 110, 170)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(45, 75, 120)),
+}
+afkGrad.Rotation = 90
+afkGrad.Parent = afkBtn
+
+local tpBtn = Instance.new("TextButton")
+tpBtn.Size = UDim2.new(0.48, 0, 0, 30)
+tpBtn.Position = UDim2.new(0.52, 0, 0, 92)
+tpBtn.BackgroundColor3 = Color3.fromRGB(45, 60, 90)
+tpBtn.Text = "传送到点"
+tpBtn.TextColor3 = Color3.fromRGB(220, 230, 250)
+tpBtn.TextSize = 11
+tpBtn.Font = Enum.Font.GothamBold
+tpBtn.AutoButtonColor = false
+tpBtn.ZIndex = 6
+tpBtn.Parent = card
+Instance.new("UICorner", tpBtn).CornerRadius = UDim.new(0, 6)
+
+local tpGrad = Instance.new("UIGradient")
+tpGrad.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(160, 120, 190)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(105, 75, 140)),
+}
+tpGrad.Rotation = 90
+tpGrad.Parent = tpBtn
+
+local infoLine = Instance.new("TextLabel")
+infoLine.Size = UDim2.new(1, -20, 0, 14)
+infoLine.Position = UDim2.new(0, 10, 0, 128)
+infoLine.BackgroundTransparency = 1
+infoLine.Text = ""
+infoLine.TextColor3 = Color3.fromRGB(120, 200, 140)
+infoLine.TextSize = 11
+infoLine.Font = Enum.Font.Code
+infoLine.TextXAlignment = Enum.TextXAlignment.Left
+infoLine.ZIndex = 6
+infoLine.Parent = card
+
+local statLine = Instance.new("TextLabel")
+statLine.Size = UDim2.new(1, -20, 0, 14)
+statLine.Position = UDim2.new(0, 10, 0, 148)
+statLine.BackgroundTransparency = 1
+statLine.Text = string.format("蓄力 %.1fs   已钓 0", HOLD_TIME)
+statLine.TextColor3 = Color3.fromRGB(100, 110, 130)
+statLine.TextSize = 11
+statLine.Font = Enum.Font.Gotham
+statLine.TextXAlignment = Enum.TextXAlignment.Left
+statLine.ZIndex = 6
+statLine.Parent = card
+
+local footLine = Instance.new("TextLabel")
+footLine.Size = UDim2.new(1, -20, 0, 14)
+footLine.Position = UDim2.new(0, 10, 0, 168)
+footLine.BackgroundTransparency = 1
+footLine.Text = ""
+footLine.TextColor3 = Color3.fromRGB(255, 200, 120)
+footLine.TextSize = 10
+footLine.Font = Enum.Font.Gotham
+footLine.TextXAlignment = Enum.TextXAlignment.Left
+footLine.ZIndex = 6
+footLine.Parent = card
+
+-- 拖动 + 点击
+local dragCard, dsC, csC = false, nil, nil
+title.InputBegan:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+        dragCard = true
+        dsC = i.Position
+        csC = card.Position
+    end
+end)
+UIS.InputChanged:Connect(function(i)
+    if not dragCard then return end
+    if i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch then
+        local d = i.Position - dsC
+        card.Position = UDim2.new(csC.X.Scale, csC.X.Offset + d.X, csC.Y.Scale, csC.Y.Offset + d.Y)
+    end
+end)
+title.InputEnded:Connect(function() dragCard = false end)
+
+local dragBtn, dsB, csB, movedBtn = false, nil, nil, false
+local CLICK_THRESHOLD = 15
+
+toggleBtn.InputBegan:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+        dragBtn = true
+        movedBtn = false
+        dsB = i.Position
+        csB = toggleBtn.Position
+    end
+end)
+
+UIS.InputChanged:Connect(function(i)
+    if not dragBtn then return end
+    if i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch then
+        local d = i.Position - dsB
+        if d.Magnitude > CLICK_THRESHOLD then
+            movedBtn = true
+            toggleBtn.Position = UDim2.new(csB.X.Scale, csB.X.Offset + d.X, csB.Y.Scale, csB.Y.Offset + d.Y)
+        end
+    end
+end)
+
+toggleBtn.InputEnded:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+        if not movedBtn then
+            card.Visible = not card.Visible
+        end
+        dragBtn = false
+        movedBtn = false
+    end
+end)
+
+-- 逻辑
+local FE
+task.spawn(function()
+    FE = RS:WaitForChild("Fishing"):WaitForChild("Remotes"):WaitForChild("FishingEvent")
+end)
+
+local function getAFKRemote()
+    local RE = RS:FindFirstChild("RemoteEvents")
+    return RE and RE:FindFirstChild("AFKRemote")
+end
+
+local function getTF()
+    local g = P.PlayerGui:FindFirstChild("_LobbyUI")
+    local f = g and g:FindFirstChild("UPDATE: 10 UI Folder")
+    local fc = f and f:FindFirstChild("Fish Content")
+    local fish = fc and fc:FindFirstChild("Fishing")
+    return fish and fish:FindFirstChild("TargetFrame")
+end
+
+local function nowTime() return tick() end
+
+local running = false
+local currentIndex = 0
+local lastHit = 0
+local roundId = 0
+local curIdx = 1
+local waterPoints = {}
+local totalCaught = 0
+local afkOn = false
+
+local function updateStat()
+    statLine.Text = string.format("蓄力 %.1fs   已钓 %d", HOLD_TIME, totalCaught)
+end
+
+local function setUI(state)
+    if state == "running" then
+        dot.BackgroundColor3 = Color3.fromRGB(80, 220, 120)
+        statusText.Text = "运行中"
+        statusText.TextColor3 = Color3.fromRGB(120, 220, 150)
+        btn.Text = "停止"
+        btnGrad.Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(210, 90, 90)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(160, 55, 55)),
+        }
+    else
+        dot.BackgroundColor3 = Color3.fromRGB(100, 100, 120)
+        statusText.Text = "已停止"
+        statusText.TextColor3 = Color3.fromRGB(140, 150, 170)
+        btn.Text = "开始"
+        btnGrad.Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(85, 130, 200)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(55, 85, 140)),
+        }
+    end
+end
+
+local function scanWater()
+    local c = P.Character
+    if not c then return {} end
+    local h = c:FindFirstChild("HumanoidRootPart")
+    if not h then return {} end
+    local base = h.Position
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances = {c}
+    local found = {}
+    for dx = -20, 20, 2 do
+        for dz = -20, 20, 2 do
+            local r = workspace:Raycast(base + Vector3.new(dx, 100, dz), Vector3.new(0, -300, 0), params)
+            if r and r.Material == Enum.Material.Water then
+                table.insert(found, Vector3.new(base.X + dx, r.Position.Y, base.Z + dz))
+            end
+        end
+    end
+    return found
+end
+
+local function startRound()
+    if not running then return end
+    if #waterPoints == 0 then
+        waterPoints = scanWater()
+        if #waterPoints == 0 then
+            task.wait(2)
+            if running then startRound() end
+            return
+        end
+    end
+    if curIdx > #waterPoints then curIdx = 1 end
+    local pos = waterPoints[curIdx]
+    curIdx = curIdx + 1
+    if not FE then return end
+
+    currentIndex = 0
+    roundId = roundId + 1
+    local myId = roundId
+
+    infoLine.Text = "抛竿中..."
+    FE:FireServer("Cast", {Position = pos})
+
+    task.delay(30, function()
+        if roundId == myId and running then
+            startRound()
+        end
+    end)
+end
+
+local function startFishing()
+    if running then return end
+    running = true
+    roundId = roundId + 1
+    currentIndex = 0
+    curIdx = 1
+    setUI("running")
+    task.spawn(function()
+        if not FE then task.wait(0.5) end
+        task.wait(0.3)
+        waterPoints = scanWater()
+        startRound()
+    end)
+end
+
+local function stopFishing()
+    running = false
+    roundId = roundId + 1
+    currentIndex = 0
+    lastHit = 0
+    setUI("stopped")
+    infoLine.Text = ""
+end
+
+local function doTeleport()
+    local c = P.Character
+    if not c then footLine.Text = "角色不存在" return false end
+    local h = c:FindFirstChild("HumanoidRootPart")
+    if not h then footLine.Text = "找不到 HRP" return false end
+    h.CFrame = CFrame.new(TARGET_POS)
+    footLine.Text = "已传送"
+    return true
+end
+
+local function enableAFK()
+    local afk = getAFKRemote()
+    if not afk then footLine.Text = "找不到 AFKRemote" return end
+    afk:FireServer("Start")
+    afkOn = true
+    afkBtn.Text = "关闭 AFK"
+    afkGrad.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(80, 190, 120)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(55, 140, 85)),
+    }
+    footLine.Text = "AFK 已开启"
+    print("[AFK] Start")
+end
+
+local function disableAFK()
+    local afk = getAFKRemote()
+    if afk then
+        for _, act in ipairs({"Stop", "End", "Cancel", "Close", "Leave", "Idle", "StopAFK"}) do
+            pcall(function() afk:FireServer(act) end)
+        end
+    end
+    afkOn = false
+    afkBtn.Text = "开启 AFK"
+    afkGrad.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(70, 110, 170)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(45, 75, 120)),
+    }
+    footLine.Text = "AFK 已关闭"
+    print("[AFK] Stop")
+end
+
+task.spawn(function()
+    while not FE do task.wait(0.2) end
+
+    FE.OnClientEvent:Connect(function(action, data)
+        if not running then return end
+        if type(data) ~= "table" then return end
+
+        if action == "CastStarted" then
+            infoLine.Text = "蓄力中..."
+            task.spawn(function()
+                task.wait(0.3)
+                if not running then return end
+                FE:FireServer("LuckHold", {ClickTime = nowTime()})
+                local endT = tick() + HOLD_TIME
+                while tick() < endT do
+                    if not running then return end
+                    FE:FireServer("LuckHold", {ClickTime = nowTime()})
+                    task.wait(0.1)
+                end
+                if not running then return end
+                infoLine.Text = "释放..."
+                FE:FireServer("LuckRelease", {ClickTime = nowTime()})
+            end)
+
+        elseif action == "LuckLocked" then
+            local luck = data.Luck or 0
+            infoLine.Text = string.format("x%.2f", luck)
+
+        elseif action == "Target" then
+            currentIndex = data.Index or 0
+            infoLine.Text = "判定 " .. currentIndex
+
+        elseif action == "Catch" then
+            totalCaught = totalCaught + 1
+            updateStat()
+            infoLine.Text = "钓到!"
+            task.wait(0.3)
+            if running then startRound() end
+        end
+    end)
+end)
+
+task.spawn(function()
+    while true do
+        task.wait(0.03)
+        if running and currentIndex > 0 then
+            local tf = getTF()
+            if tf and tf.Visible then
+                local cl = tf:FindFirstChild("Click")
+                if cl and cl.Visible and cl.AbsoluteSize.X > 0 then
+                    local now = tick()
+                    if now - lastHit >= HIT_GAP then
+                        lastHit = now
+                        FE:FireServer("Hit", {
+                            Index = currentIndex,
+                            ClickTime = nowTime()
+                        })
+                    end
+                end
+            end
+        end
+    end
+end)
+
+btn.Activated:Connect(function()
+    if running then stopFishing() else startFishing() end
+end)
+
+afkBtn.Activated:Connect(function()
+    if afkOn then disableAFK() else enableAFK() end
+end)
+
+tpBtn.Activated:Connect(function()
+    doTeleport()
+end)
+
+-- ★ 自启动（每次加载脚本都执行）
+task.spawn(function()
+    if not P.Character then P.CharacterAdded:Wait() end
+    task.wait(1)
+
+    -- ① 传送
+    for i = 1, 5 do
+        local h = P.Character and P.Character:FindFirstChild("HumanoidRootPart")
+        if h then
+            h.CFrame = CFrame.new(TARGET_POS)
+            footLine.Text = "启动传送完成"
+            break
+        end
+        task.wait(0.5)
+    end
+
+    -- ② AFK
+    task.wait(0.3)
+    enableAFK()
+
+    -- ③ 钓鱼
+    if AUTO_START then
+        task.wait(0.5)
+        startFishing()
+    end
+
+    print("[自启动] 传送 + AFK + 钓鱼 已全部启动")
+end)
+
+print("OK")
