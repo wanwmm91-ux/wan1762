@@ -5,7 +5,8 @@ local UIS = game:GetService("UserInputService")
 local AUTO_START = true
 local HOLD_TIME = 1.0
 local HIT_GAP = 0.05
-local TARGET_POS = Vector3.new(-6828.9, 27.5, 1044.1)
+local TELEPORT_POS = Vector3.new(-7033.7, 27.4, 1026.6)
+local CAST_POS = Vector3.new(-7043.2705078125, 20.706335067749023, 1046.2252197265625)
 
 for _, v in ipairs(P.PlayerGui:GetChildren()) do
     if v.Name == "FishAuto" then v:Destroy() end
@@ -18,7 +19,6 @@ sg.IgnoreGuiInset = true
 sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 sg.Parent = P:WaitForChild("PlayerGui")
 
--- 主开关按钮
 local toggleBtn = Instance.new("TextButton")
 toggleBtn.Name = "wan1762"
 toggleBtn.Size = UDim2.new(0, 90, 0, 36)
@@ -46,7 +46,6 @@ toggleGrad.Color = ColorSequence.new{
 toggleGrad.Rotation = 90
 toggleGrad.Parent = toggleBtn
 
--- 面板
 local card = Instance.new("Frame")
 card.Size = UDim2.new(0, 200, 0, 198)
 card.Position = UDim2.new(0.7, 0, 0.3, 0)
@@ -202,7 +201,6 @@ footLine.TextXAlignment = Enum.TextXAlignment.Left
 footLine.ZIndex = 6
 footLine.Parent = card
 
--- 拖动 + 点击
 local dragCard, dsC, csC = false, nil, nil
 title.InputBegan:Connect(function(i)
     if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
@@ -253,7 +251,6 @@ toggleBtn.InputEnded:Connect(function(i)
     end
 end)
 
--- 逻辑
 local FE
 task.spawn(function()
     FE = RS:WaitForChild("Fishing"):WaitForChild("Remotes"):WaitForChild("FishingEvent")
@@ -278,8 +275,6 @@ local running = false
 local currentIndex = 0
 local lastHit = 0
 local roundId = 0
-local curIdx = 1
-local waterPoints = {}
 local totalCaught = 0
 local afkOn = false
 
@@ -309,40 +304,8 @@ local function setUI(state)
     end
 end
 
-local function scanWater()
-    local c = P.Character
-    if not c then return {} end
-    local h = c:FindFirstChild("HumanoidRootPart")
-    if not h then return {} end
-    local base = h.Position
-    local params = RaycastParams.new()
-    params.FilterType = Enum.RaycastFilterType.Exclude
-    params.FilterDescendantsInstances = {c}
-    local found = {}
-    for dx = -20, 20, 2 do
-        for dz = -20, 20, 2 do
-            local r = workspace:Raycast(base + Vector3.new(dx, 100, dz), Vector3.new(0, -300, 0), params)
-            if r and r.Material == Enum.Material.Water then
-                table.insert(found, Vector3.new(base.X + dx, r.Position.Y, base.Z + dz))
-            end
-        end
-    end
-    return found
-end
-
 local function startRound()
     if not running then return end
-    if #waterPoints == 0 then
-        waterPoints = scanWater()
-        if #waterPoints == 0 then
-            task.wait(2)
-            if running then startRound() end
-            return
-        end
-    end
-    if curIdx > #waterPoints then curIdx = 1 end
-    local pos = waterPoints[curIdx]
-    curIdx = curIdx + 1
     if not FE then return end
 
     currentIndex = 0
@@ -350,7 +313,8 @@ local function startRound()
     local myId = roundId
 
     infoLine.Text = "抛竿中..."
-    FE:FireServer("Cast", {Position = pos})
+    -- ★ 使用固定钓鱼坐标
+    FE:FireServer("Cast", {Position = CAST_POS})
 
     task.delay(30, function()
         if roundId == myId and running then
@@ -364,12 +328,10 @@ local function startFishing()
     running = true
     roundId = roundId + 1
     currentIndex = 0
-    curIdx = 1
     setUI("running")
     task.spawn(function()
         if not FE then task.wait(0.5) end
         task.wait(0.3)
-        waterPoints = scanWater()
         startRound()
     end)
 end
@@ -388,7 +350,7 @@ local function doTeleport()
     if not c then footLine.Text = "角色不存在" return false end
     local h = c:FindFirstChild("HumanoidRootPart")
     if not h then footLine.Text = "找不到 HRP" return false end
-    h.CFrame = CFrame.new(TARGET_POS)
+    h.CFrame = CFrame.new(TELEPORT_POS)   -- ★ 用新坐标
     footLine.Text = "已传送"
     return true
 end
@@ -500,27 +462,24 @@ tpBtn.Activated:Connect(function()
     doTeleport()
 end)
 
--- ★ 自启动（每次加载脚本都执行）
+-- 自启动
 task.spawn(function()
     if not P.Character then P.CharacterAdded:Wait() end
     task.wait(1)
 
-    -- ① 传送
     for i = 1, 5 do
         local h = P.Character and P.Character:FindFirstChild("HumanoidRootPart")
         if h then
-            h.CFrame = CFrame.new(TARGET_POS)
+            h.CFrame = CFrame.new(TELEPORT_POS)   -- ★ 用新坐标
             footLine.Text = "启动传送完成"
             break
         end
         task.wait(0.5)
     end
 
-    -- ② AFK
     task.wait(0.3)
     enableAFK()
 
-    -- ③ 钓鱼
     if AUTO_START then
         task.wait(0.5)
         startFishing()
