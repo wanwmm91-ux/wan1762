@@ -2,20 +2,40 @@ local P = game:GetService("Players").LocalPlayer
 local RS = game:GetService("ReplicatedStorage")
 local UIS = game:GetService("UserInputService")
 
+-- ========== 配置 ==========
 local AUTO_START = true
 local HOLD_TIME = 1.0
 local HIT_GAP = 0.05
-local TELEPORT_POS = Vector3.new(-7033.7, 27.4, 1026.6)
-local CAST_POS = Vector3.new(-7043.2705078125, 20.706335067749023, 1046.2252197265625)
 
+-- ★ 钓点1
+local SPOT1_TP   = Vector3.new(-6921.9, 23.4, 1052.5)
+local SPOT1_CAST = Vector3.new(-6901.70263671875, 15.953121185302734, 1066.5797119140625)
+
+-- ★ 钓点2
+local SPOT2_TP   = Vector3.new(-7033.3, 27.5, 1026.7)
+local SPOT2_CAST = Vector3.new(-7042.85888671875, 20.706336975097656, 1041.733642578125)
+
+-- ★ 市场坐标（卖鱼/合成前传送）
+local MARKET_POS = Vector3.new(-6209.0, 26.4, 1543.5)
+
+-- ★ 只卖这些鱼
+local SELL_FISH = {
+    "Tuna", "Salmon", "Goldfish", "Sunfish", "Yellow Tang", "Swordfish",
+    "Ash Minnow", "Ember Fish", "Ember Snail", "Molten Sunfish",
+    "Obsidian Puffer", "Magma Shark",
+}
+
+-- ========== 清理旧UI ==========
 for _, v in ipairs(P.PlayerGui:GetChildren()) do
     if v.Name == "FishAuto" then v:Destroy() end
 end
 
+-- ========== ScreenGui ==========
 local sg = Instance.new("ScreenGui")
 sg.Name = "FishAuto"
 sg.ResetOnSpawn = false
 sg.IgnoreGuiInset = true
+sg.DisplayOrder = 9999
 sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 sg.Parent = P:WaitForChild("PlayerGui")
 
@@ -29,7 +49,7 @@ toggleBtn.TextColor3 = Color3.fromRGB(190, 210, 240)
 toggleBtn.TextSize = 13
 toggleBtn.Font = Enum.Font.GothamBold
 toggleBtn.AutoButtonColor = false
-toggleBtn.ZIndex = 10
+toggleBtn.ZIndex = 100
 toggleBtn.Parent = sg
 Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 8)
 
@@ -47,12 +67,12 @@ toggleGrad.Rotation = 90
 toggleGrad.Parent = toggleBtn
 
 local card = Instance.new("Frame")
-card.Size = UDim2.new(0, 200, 0, 198)
-card.Position = UDim2.new(0.7, 0, 0.3, 0)
+card.Size = UDim2.new(0, 230, 0, 280)
+card.Position = UDim2.new(0.66, 0, 0.28, 0)
 card.BackgroundColor3 = Color3.fromRGB(25, 28, 35)
 card.BorderSizePixel = 0
 card.Visible = false
-card.ZIndex = 5
+card.ZIndex = 50
 card.Parent = sg
 Instance.new("UICorner", card).CornerRadius = UDim.new(0, 14)
 
@@ -72,47 +92,89 @@ cardStroke.Transparency = 0.4
 local title = Instance.new("TextButton")
 title.Size = UDim2.new(1, 0, 0, 28)
 title.BackgroundTransparency = 1
-title.Text = "   自动钓鱼"
+title.Text = "   脚本控制"
 title.TextColor3 = Color3.fromRGB(190, 210, 240)
 title.TextSize = 14
 title.Font = Enum.Font.GothamBold
 title.TextXAlignment = Enum.TextXAlignment.Left
 title.AutoButtonColor = false
-title.ZIndex = 6
+title.ZIndex = 51
 title.Parent = card
+
+-- 4 个标签
+local tabFrame = Instance.new("Frame")
+tabFrame.Size = UDim2.new(1, -20, 0, 28)
+tabFrame.Position = UDim2.new(0, 10, 0, 32)
+tabFrame.BackgroundTransparency = 1
+tabFrame.ZIndex = 51
+tabFrame.Parent = card
+
+local function makeTab(text, xPos, widthScale)
+    local t = Instance.new("TextButton")
+    t.Size = UDim2.new(widthScale, -3, 1, 0)
+    t.Position = UDim2.new(xPos, 0, 0, 0)
+    t.BackgroundColor3 = Color3.fromRGB(35, 40, 55)
+    t.Text = text
+    t.TextColor3 = Color3.fromRGB(160, 170, 190)
+    t.TextSize = 11
+    t.Font = Enum.Font.GothamBold
+    t.AutoButtonColor = false
+    t.ZIndex = 51
+    t.Parent = tabFrame
+    Instance.new("UICorner", t).CornerRadius = UDim.new(0, 6)
+    return t
+end
+
+local tabFish = makeTab("钓鱼", 0,    0.26)
+local tabDraw = makeTab("抽奖", 0.26, 0.26)
+local tabSell = makeTab("卖鱼", 0.52, 0.24)
+local tabCraft= makeTab("合成", 0.76, 0.24)
+
+local TAB_ACTIVE_BG = Color3.fromRGB(55, 75, 115)
+local TAB_ACTIVE_TC = Color3.fromRGB(220, 230, 250)
+local TAB_IDLE_BG   = Color3.fromRGB(35, 40, 55)
+local TAB_IDLE_TC   = Color3.fromRGB(160, 170, 190)
+
+-- ========== 钓鱼面板 ==========
+local fishPanel = Instance.new("Frame")
+fishPanel.Size = UDim2.new(1, -20, 1, -100)
+fishPanel.Position = UDim2.new(0, 10, 0, 66)
+fishPanel.BackgroundTransparency = 1
+fishPanel.ZIndex = 51
+fishPanel.Parent = card
 
 local dot = Instance.new("Frame")
 dot.Size = UDim2.new(0, 8, 0, 8)
-dot.Position = UDim2.new(1, -20, 0, 10)
+dot.Position = UDim2.new(1, -18, 0, 2)
 dot.BackgroundColor3 = Color3.fromRGB(100, 100, 120)
 dot.BorderSizePixel = 0
-dot.ZIndex = 6
-dot.Parent = card
+dot.ZIndex = 52
+dot.Parent = fishPanel
 Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
 
 local statusText = Instance.new("TextLabel")
 statusText.Size = UDim2.new(1, -20, 0, 14)
-statusText.Position = UDim2.new(0, 10, 0, 30)
+statusText.Position = UDim2.new(0, 0, 0, 0)
 statusText.BackgroundTransparency = 1
 statusText.Text = "已停止"
 statusText.TextColor3 = Color3.fromRGB(140, 150, 170)
 statusText.TextSize = 11
 statusText.Font = Enum.Font.Gotham
 statusText.TextXAlignment = Enum.TextXAlignment.Left
-statusText.ZIndex = 6
-statusText.Parent = card
+statusText.ZIndex = 52
+statusText.Parent = fishPanel
 
 local btn = Instance.new("TextButton")
-btn.Size = UDim2.new(1, -20, 0, 36)
-btn.Position = UDim2.new(0, 10, 0, 50)
+btn.Size = UDim2.new(1, 0, 0, 34)
+btn.Position = UDim2.new(0, 0, 0, 18)
 btn.BackgroundColor3 = Color3.fromRGB(60, 80, 130)
-btn.Text = "开始"
+btn.Text = "开始钓鱼"
 btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-btn.TextSize = 14
+btn.TextSize = 13
 btn.Font = Enum.Font.GothamBold
 btn.AutoButtonColor = false
-btn.ZIndex = 6
-btn.Parent = card
+btn.ZIndex = 52
+btn.Parent = fishPanel
 Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
 
 local btnGrad = Instance.new("UIGradient")
@@ -124,16 +186,16 @@ btnGrad.Rotation = 90
 btnGrad.Parent = btn
 
 local afkBtn = Instance.new("TextButton")
-afkBtn.Size = UDim2.new(0.48, 0, 0, 30)
-afkBtn.Position = UDim2.new(0, 10, 0, 92)
+afkBtn.Size = UDim2.new(0.48, 0, 0, 28)
+afkBtn.Position = UDim2.new(0, 0, 0, 58)
 afkBtn.BackgroundColor3 = Color3.fromRGB(45, 60, 90)
 afkBtn.Text = "开启 AFK"
 afkBtn.TextColor3 = Color3.fromRGB(220, 230, 250)
 afkBtn.TextSize = 11
 afkBtn.Font = Enum.Font.GothamBold
 afkBtn.AutoButtonColor = false
-afkBtn.ZIndex = 6
-afkBtn.Parent = card
+afkBtn.ZIndex = 52
+afkBtn.Parent = fishPanel
 Instance.new("UICorner", afkBtn).CornerRadius = UDim.new(0, 6)
 
 local afkGrad = Instance.new("UIGradient")
@@ -144,63 +206,481 @@ afkGrad.Color = ColorSequence.new{
 afkGrad.Rotation = 90
 afkGrad.Parent = afkBtn
 
+local switchBtn = Instance.new("TextButton")
+switchBtn.Size = UDim2.new(0.48, 0, 0, 28)
+switchBtn.Position = UDim2.new(0.52, 0, 0, 58)
+switchBtn.BackgroundColor3 = Color3.fromRGB(45, 60, 90)
+switchBtn.Text = "切到钓点2"
+switchBtn.TextColor3 = Color3.fromRGB(220, 230, 250)
+switchBtn.TextSize = 11
+switchBtn.Font = Enum.Font.GothamBold
+switchBtn.AutoButtonColor = false
+switchBtn.ZIndex = 52
+switchBtn.Parent = fishPanel
+Instance.new("UICorner", switchBtn).CornerRadius = UDim.new(0, 6)
+
+local switchGrad = Instance.new("UIGradient")
+switchGrad.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(160, 120, 190)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(105, 75, 140)),
+}
+switchGrad.Rotation = 90
+switchGrad.Parent = switchBtn
+
 local tpBtn = Instance.new("TextButton")
-tpBtn.Size = UDim2.new(0.48, 0, 0, 30)
-tpBtn.Position = UDim2.new(0.52, 0, 0, 92)
-tpBtn.BackgroundColor3 = Color3.fromRGB(45, 60, 90)
-tpBtn.Text = "传送到点"
-tpBtn.TextColor3 = Color3.fromRGB(220, 230, 250)
+tpBtn.Size = UDim2.new(1, 0, 0, 28)
+tpBtn.Position = UDim2.new(0, 0, 0, 90)
+tpBtn.BackgroundColor3 = Color3.fromRGB(45, 70, 60)
+tpBtn.Text = "传送到当前钓点"
+tpBtn.TextColor3 = Color3.fromRGB(200, 240, 220)
 tpBtn.TextSize = 11
 tpBtn.Font = Enum.Font.GothamBold
 tpBtn.AutoButtonColor = false
-tpBtn.ZIndex = 6
-tpBtn.Parent = card
+tpBtn.ZIndex = 52
+tpBtn.Parent = fishPanel
 Instance.new("UICorner", tpBtn).CornerRadius = UDim.new(0, 6)
 
 local tpGrad = Instance.new("UIGradient")
 tpGrad.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(160, 120, 190)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(105, 75, 140)),
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(70, 150, 110)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(45, 110, 80)),
 }
 tpGrad.Rotation = 90
 tpGrad.Parent = tpBtn
 
 local infoLine = Instance.new("TextLabel")
-infoLine.Size = UDim2.new(1, -20, 0, 14)
-infoLine.Position = UDim2.new(0, 10, 0, 128)
+infoLine.Size = UDim2.new(1, 0, 0, 14)
+infoLine.Position = UDim2.new(0, 0, 0, 122)
 infoLine.BackgroundTransparency = 1
 infoLine.Text = ""
 infoLine.TextColor3 = Color3.fromRGB(120, 200, 140)
 infoLine.TextSize = 11
 infoLine.Font = Enum.Font.Code
 infoLine.TextXAlignment = Enum.TextXAlignment.Left
-infoLine.ZIndex = 6
-infoLine.Parent = card
+infoLine.ZIndex = 52
+infoLine.Parent = fishPanel
+
+local spotLine = Instance.new("TextLabel")
+spotLine.Size = UDim2.new(1, 0, 0, 14)
+spotLine.Position = UDim2.new(0, 0, 0, 138)
+spotLine.BackgroundTransparency = 1
+spotLine.Text = "钓点1"
+spotLine.TextColor3 = Color3.fromRGB(140, 180, 220)
+spotLine.TextSize = 11
+spotLine.Font = Enum.Font.Code
+spotLine.TextXAlignment = Enum.TextXAlignment.Left
+spotLine.ZIndex = 52
+spotLine.Parent = fishPanel
 
 local statLine = Instance.new("TextLabel")
-statLine.Size = UDim2.new(1, -20, 0, 14)
-statLine.Position = UDim2.new(0, 10, 0, 148)
+statLine.Size = UDim2.new(1, 0, 0, 14)
+statLine.Position = UDim2.new(0, 0, 0, 154)
 statLine.BackgroundTransparency = 1
 statLine.Text = string.format("蓄力 %.1fs   已钓 0", HOLD_TIME)
 statLine.TextColor3 = Color3.fromRGB(100, 110, 130)
 statLine.TextSize = 11
 statLine.Font = Enum.Font.Gotham
 statLine.TextXAlignment = Enum.TextXAlignment.Left
-statLine.ZIndex = 6
-statLine.Parent = card
+statLine.ZIndex = 52
+statLine.Parent = fishPanel
 
 local footLine = Instance.new("TextLabel")
-footLine.Size = UDim2.new(1, -20, 0, 14)
-footLine.Position = UDim2.new(0, 10, 0, 168)
+footLine.Size = UDim2.new(1, 0, 0, 14)
+footLine.Position = UDim2.new(0, 0, 0, 170)
 footLine.BackgroundTransparency = 1
 footLine.Text = ""
 footLine.TextColor3 = Color3.fromRGB(255, 200, 120)
 footLine.TextSize = 10
 footLine.Font = Enum.Font.Gotham
 footLine.TextXAlignment = Enum.TextXAlignment.Left
-footLine.ZIndex = 6
-footLine.Parent = card
+footLine.ZIndex = 52
+footLine.Parent = fishPanel
 
+-- ========== 抽奖面板 ==========
+local drawPanel = Instance.new("Frame")
+drawPanel.Size = UDim2.new(1, -20, 1, -100)
+drawPanel.Position = UDim2.new(0, 10, 0, 66)
+drawPanel.BackgroundTransparency = 1
+drawPanel.Visible = false
+drawPanel.ZIndex = 51
+drawPanel.Parent = card
+
+local drawDot = Instance.new("Frame")
+drawDot.Size = UDim2.new(0, 8, 0, 8)
+drawDot.Position = UDim2.new(1, -18, 0, 2)
+drawDot.BackgroundColor3 = Color3.fromRGB(100, 100, 120)
+drawDot.BorderSizePixel = 0
+drawDot.ZIndex = 52
+drawDot.Parent = drawPanel
+Instance.new("UICorner", drawDot).CornerRadius = UDim.new(1, 0)
+
+local drawStatus = Instance.new("TextLabel")
+drawStatus.Size = UDim2.new(1, -20, 0, 14)
+drawStatus.Position = UDim2.new(0, 0, 0, 0)
+drawStatus.BackgroundTransparency = 1
+drawStatus.Text = "未选择"
+drawStatus.TextColor3 = Color3.fromRGB(140, 150, 170)
+drawStatus.TextSize = 11
+drawStatus.Font = Enum.Font.Gotham
+drawStatus.TextXAlignment = Enum.TextXAlignment.Left
+drawStatus.ZIndex = 52
+drawStatus.Parent = drawPanel
+
+local drawBtn = Instance.new("TextButton")
+drawBtn.Size = UDim2.new(1, 0, 0, 34)
+drawBtn.Position = UDim2.new(0, 0, 0, 18)
+drawBtn.BackgroundColor3 = Color3.fromRGB(60, 80, 130)
+drawBtn.Text = "开始循环"
+drawBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+drawBtn.TextSize = 13
+drawBtn.Font = Enum.Font.GothamBold
+drawBtn.AutoButtonColor = false
+drawBtn.ZIndex = 52
+drawBtn.Parent = drawPanel
+Instance.new("UICorner", drawBtn).CornerRadius = UDim.new(0, 8)
+
+local drawGrad = Instance.new("UIGradient")
+drawGrad.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(180, 120, 200)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(120, 70, 150)),
+}
+drawGrad.Rotation = 90
+drawGrad.Parent = drawBtn
+
+local function makeDrawOptionBtn(text, y, key)
+    local b = Instance.new("TextButton")
+    b.Size = UDim2.new(1, 0, 0, 26)
+    b.Position = UDim2.new(0, 0, 0, y)
+    b.BackgroundColor3 = Color3.fromRGB(40, 50, 70)
+    b.Text = text
+    b.TextColor3 = Color3.fromRGB(200, 215, 235)
+    b.TextSize = 11
+    b.Font = Enum.Font.GothamBold
+    b.AutoButtonColor = false
+    b.ZIndex = 52
+    b.Parent = drawPanel
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 5)
+    b:SetAttribute("ActionKey", key)
+    return b
+end
+
+local opt10M    = makeDrawOptionBtn("10MCrate ×6", 60, "10MCrate")
+local optSci    = makeDrawOptionBtn("ScientistCrate ×6", 88, "ScientistCrate")
+local optParty  = makeDrawOptionBtn("PartyCrate ×6", 116, "PartyCrate")
+local optLuck   = makeDrawOptionBtn("Luck Boost", 144, "Luck")
+local optSummon = makeDrawOptionBtn("召唤单位 ×10", 172, "SummonUnits")
+
+local OPTION_DEFAULT_BG = Color3.fromRGB(40, 50, 70)
+local OPTION_SELECTED_BG = Color3.fromRGB(70, 150, 200)
+local OPTION_DEFAULT_TC = Color3.fromRGB(200, 215, 235)
+local OPTION_SELECTED_TC = Color3.fromRGB(255, 255, 255)
+
+local selectedAction = nil
+local allOptionBtns = {opt10M, optSci, optParty, optLuck, optSummon}
+
+local function clearSelection()
+    selectedAction = nil
+    for _, ob in ipairs(allOptionBtns) do
+        ob.BackgroundColor3 = OPTION_DEFAULT_BG
+        ob.TextColor3 = OPTION_DEFAULT_TC
+    end
+    drawStatus.Text = "未选择"
+    drawStatus.TextColor3 = Color3.fromRGB(140, 150, 170)
+end
+
+local function selectOption(btn, key)
+    selectedAction = key
+    for _, ob in ipairs(allOptionBtns) do
+        if ob == btn then
+            ob.BackgroundColor3 = OPTION_SELECTED_BG
+            ob.TextColor3 = OPTION_SELECTED_TC
+        else
+            ob.BackgroundColor3 = OPTION_DEFAULT_BG
+            ob.TextColor3 = OPTION_DEFAULT_TC
+        end
+    end
+    drawStatus.Text = "已选: " .. btn.Text
+    drawStatus.TextColor3 = Color3.fromRGB(120, 220, 150)
+end
+
+local function bindOption(btn)
+    btn.Activated:Connect(function()
+        local key = btn:GetAttribute("ActionKey")
+        if selectedAction == key then
+            clearSelection()
+        else
+            selectOption(btn, key)
+        end
+    end)
+end
+
+bindOption(opt10M)
+bindOption(optSci)
+bindOption(optParty)
+bindOption(optLuck)
+bindOption(optSummon)
+
+local drawStat = Instance.new("TextLabel")
+drawStat.Size = UDim2.new(1, 0, 0, 14)
+drawStat.Position = UDim2.new(0, 0, 0, 202)
+drawStat.BackgroundTransparency = 1
+drawStat.Text = "已抽 0 次"
+drawStat.TextColor3 = Color3.fromRGB(100, 110, 130)
+drawStat.TextSize = 11
+drawStat.Font = Enum.Font.Gotham
+drawStat.TextXAlignment = Enum.TextXAlignment.Left
+drawStat.ZIndex = 52
+drawStat.Parent = drawPanel
+
+-- ========== 卖鱼面板 ==========
+local sellPanel = Instance.new("Frame")
+sellPanel.Size = UDim2.new(1, -20, 1, -100)
+sellPanel.Position = UDim2.new(0, 10, 0, 66)
+sellPanel.BackgroundTransparency = 1
+sellPanel.Visible = false
+sellPanel.ZIndex = 51
+sellPanel.Parent = card
+
+local sellDot = Instance.new("Frame")
+sellDot.Size = UDim2.new(0, 8, 0, 8)
+sellDot.Position = UDim2.new(1, -18, 0, 2)
+sellDot.BackgroundColor3 = Color3.fromRGB(100, 100, 120)
+sellDot.BorderSizePixel = 0
+sellDot.ZIndex = 52
+sellDot.Parent = sellPanel
+Instance.new("UICorner", sellDot).CornerRadius = UDim.new(1, 0)
+
+local sellStatus = Instance.new("TextLabel")
+sellStatus.Size = UDim2.new(1, -20, 0, 14)
+sellStatus.Position = UDim2.new(0, 0, 0, 0)
+sellStatus.BackgroundTransparency = 1
+sellStatus.Text = "待命"
+sellStatus.TextColor3 = Color3.fromRGB(140, 150, 170)
+sellStatus.TextSize = 11
+sellStatus.Font = Enum.Font.Gotham
+sellStatus.TextXAlignment = Enum.TextXAlignment.Left
+sellStatus.ZIndex = 52
+sellStatus.Parent = sellPanel
+
+local sellBtn = Instance.new("TextButton")
+sellBtn.Size = UDim2.new(1, 0, 0, 42)
+sellBtn.Position = UDim2.new(0, 0, 0, 22)
+sellBtn.BackgroundColor3 = Color3.fromRGB(80, 130, 90)
+sellBtn.Text = "一键卖出全部鱼"
+sellBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+sellBtn.TextSize = 14
+sellBtn.Font = Enum.Font.GothamBold
+sellBtn.AutoButtonColor = false
+sellBtn.ZIndex = 52
+sellBtn.Parent = sellPanel
+Instance.new("UICorner", sellBtn).CornerRadius = UDim.new(0, 8)
+
+local sellGrad = Instance.new("UIGradient")
+sellGrad.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(90, 200, 130)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(55, 150, 90)),
+}
+sellGrad.Rotation = 90
+sellGrad.Parent = sellBtn
+
+local scanBtn = Instance.new("TextButton")
+scanBtn.Size = UDim2.new(1, 0, 0, 26)
+scanBtn.Position = UDim2.new(0, 0, 0, 70)
+scanBtn.BackgroundColor3 = Color3.fromRGB(45, 60, 90)
+scanBtn.Text = "扫描库存"
+scanBtn.TextColor3 = Color3.fromRGB(220, 230, 250)
+scanBtn.TextSize = 11
+scanBtn.Font = Enum.Font.GothamBold
+scanBtn.AutoButtonColor = false
+scanBtn.ZIndex = 52
+scanBtn.Parent = sellPanel
+Instance.new("UICorner", scanBtn).CornerRadius = UDim.new(0, 6)
+
+local sellInfo = Instance.new("TextLabel")
+sellInfo.Size = UDim2.new(1, 0, 1, -100)
+sellInfo.Position = UDim2.new(0, 0, 0, 102)
+sellInfo.BackgroundTransparency = 1
+sellInfo.Text = ""
+sellInfo.TextColor3 = Color3.fromRGB(120, 200, 140)
+sellInfo.TextSize = 10
+sellInfo.Font = Enum.Font.Code
+sellInfo.TextXAlignment = Enum.TextXAlignment.Left
+sellInfo.TextYAlignment = Enum.TextYAlignment.Top
+sellInfo.TextWrapped = true
+sellInfo.ZIndex = 52
+sellInfo.Parent = sellPanel
+
+-- ========== 合成面板 ==========
+local craftPanel = Instance.new("Frame")
+craftPanel.Size = UDim2.new(1, -20, 1, -100)
+craftPanel.Position = UDim2.new(0, 10, 0, 66)
+craftPanel.BackgroundTransparency = 1
+craftPanel.Visible = false
+craftPanel.ZIndex = 51
+craftPanel.Parent = card
+
+local craftDot = Instance.new("Frame")
+craftDot.Size = UDim2.new(0, 8, 0, 8)
+craftDot.Position = UDim2.new(1, -18, 0, 2)
+craftDot.BackgroundColor3 = Color3.fromRGB(100, 100, 120)
+craftDot.BorderSizePixel = 0
+craftDot.ZIndex = 52
+craftDot.Parent = craftPanel
+Instance.new("UICorner", craftDot).CornerRadius = UDim.new(1, 0)
+
+local craftStatus = Instance.new("TextLabel")
+craftStatus.Size = UDim2.new(1, -20, 0, 14)
+craftStatus.Position = UDim2.new(0, 0, 0, 0)
+craftStatus.BackgroundTransparency = 1
+craftStatus.Text = "待命"
+craftStatus.TextColor3 = Color3.fromRGB(140, 150, 170)
+craftStatus.TextSize = 11
+craftStatus.Font = Enum.Font.Gotham
+craftStatus.TextXAlignment = Enum.TextXAlignment.Left
+craftStatus.ZIndex = 52
+craftStatus.Parent = craftPanel
+
+-- Recipe 输入
+local recipeLabel = Instance.new("TextLabel")
+recipeLabel.Size = UDim2.new(0, 70, 0, 26)
+recipeLabel.Position = UDim2.new(0, 0, 0, 20)
+recipeLabel.BackgroundTransparency = 1
+recipeLabel.Text = "配方编号"
+recipeLabel.TextColor3 = Color3.fromRGB(180, 200, 220)
+recipeLabel.TextSize = 11
+recipeLabel.Font = Enum.Font.GothamBold
+recipeLabel.TextXAlignment = Enum.TextXAlignment.Left
+recipeLabel.ZIndex = 52
+recipeLabel.Parent = craftPanel
+
+local recipeBox = Instance.new("TextBox")
+recipeBox.Size = UDim2.new(1, -80, 0, 26)
+recipeBox.Position = UDim2.new(0, 80, 0, 20)
+recipeBox.BackgroundColor3 = Color3.fromRGB(40, 50, 70)
+recipeBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+recipeBox.PlaceholderText = "例如 2"
+recipeBox.Text = "2"
+recipeBox.TextSize = 12
+recipeBox.Font = Enum.Font.GothamBold
+recipeBox.ClearTextOnFocus = false
+recipeBox.ZIndex = 52
+recipeBox.Parent = craftPanel
+Instance.new("UICorner", recipeBox).CornerRadius = UDim.new(0, 6)
+
+-- 数量输入
+local countLabel = Instance.new("TextLabel")
+countLabel.Size = UDim2.new(0, 70, 0, 26)
+countLabel.Position = UDim2.new(0, 0, 0, 52)
+countLabel.BackgroundTransparency = 1
+countLabel.Text = "合成次数"
+countLabel.TextColor3 = Color3.fromRGB(180, 200, 220)
+countLabel.TextSize = 11
+countLabel.Font = Enum.Font.GothamBold
+countLabel.TextXAlignment = Enum.TextXAlignment.Left
+countLabel.ZIndex = 52
+countLabel.Parent = craftPanel
+
+local countBox = Instance.new("TextBox")
+countBox.Size = UDim2.new(1, -80, 0, 26)
+countBox.Position = UDim2.new(0, 80, 0, 52)
+countBox.BackgroundColor3 = Color3.fromRGB(40, 50, 70)
+countBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+countBox.PlaceholderText = "例如 10"
+countBox.Text = "10"
+countBox.TextSize = 12
+countBox.Font = Enum.Font.GothamBold
+countBox.ClearTextOnFocus = false
+countBox.ZIndex = 52
+countBox.Parent = craftPanel
+Instance.new("UICorner", countBox).CornerRadius = UDim.new(0, 6)
+
+local craftBtn = Instance.new("TextButton")
+craftBtn.Size = UDim2.new(1, 0, 0, 40)
+craftBtn.Position = UDim2.new(0, 0, 0, 86)
+craftBtn.BackgroundColor3 = Color3.fromRGB(120, 100, 60)
+craftBtn.Text = "开始合成"
+craftBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+craftBtn.TextSize = 14
+craftBtn.Font = Enum.Font.GothamBold
+craftBtn.AutoButtonColor = false
+craftBtn.ZIndex = 52
+craftBtn.Parent = craftPanel
+Instance.new("UICorner", craftBtn).CornerRadius = UDim.new(0, 8)
+
+local craftGrad = Instance.new("UIGradient")
+craftGrad.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(210, 170, 90)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(150, 110, 50)),
+}
+craftGrad.Rotation = 90
+craftGrad.Parent = craftBtn
+
+local teleportMarketBtn = Instance.new("TextButton")
+teleportMarketBtn.Size = UDim2.new(1, 0, 0, 26)
+teleportMarketBtn.Position = UDim2.new(0, 0, 0, 132)
+teleportMarketBtn.BackgroundColor3 = Color3.fromRGB(60, 70, 100)
+teleportMarketBtn.Text = "传送到市场"
+teleportMarketBtn.TextColor3 = Color3.fromRGB(220, 230, 250)
+teleportMarketBtn.TextSize = 11
+teleportMarketBtn.Font = Enum.Font.GothamBold
+teleportMarketBtn.AutoButtonColor = false
+teleportMarketBtn.ZIndex = 52
+teleportMarketBtn.Parent = craftPanel
+Instance.new("UICorner", teleportMarketBtn).CornerRadius = UDim.new(0, 6)
+
+local craftInfo = Instance.new("TextLabel")
+craftInfo.Size = UDim2.new(1, 0, 0, 14)
+craftInfo.Position = UDim2.new(0, 0, 0, 164)
+craftInfo.BackgroundTransparency = 1
+craftInfo.Text = ""
+craftInfo.TextColor3 = Color3.fromRGB(120, 200, 140)
+craftInfo.TextSize = 10
+craftInfo.Font = Enum.Font.Code
+craftInfo.TextXAlignment = Enum.TextXAlignment.Left
+craftInfo.ZIndex = 52
+craftInfo.Parent = craftPanel
+
+-- ========== 标签切换 ==========
+local function setTab(tab)
+    tabFish.BackgroundColor3 = TAB_IDLE_BG
+    tabFish.TextColor3 = TAB_IDLE_TC
+    tabDraw.BackgroundColor3 = TAB_IDLE_BG
+    tabDraw.TextColor3 = TAB_IDLE_TC
+    tabSell.BackgroundColor3 = TAB_IDLE_BG
+    tabSell.TextColor3 = TAB_IDLE_TC
+    tabCraft.BackgroundColor3 = TAB_IDLE_BG
+    tabCraft.TextColor3 = TAB_IDLE_TC
+
+    fishPanel.Visible = false
+    drawPanel.Visible = false
+    sellPanel.Visible = false
+    craftPanel.Visible = false
+
+    if tab == "fish" then
+        tabFish.BackgroundColor3 = TAB_ACTIVE_BG
+        tabFish.TextColor3 = TAB_ACTIVE_TC
+        fishPanel.Visible = true
+    elseif tab == "draw" then
+        tabDraw.BackgroundColor3 = TAB_ACTIVE_BG
+        tabDraw.TextColor3 = TAB_ACTIVE_TC
+        drawPanel.Visible = true
+    elseif tab == "sell" then
+        tabSell.BackgroundColor3 = TAB_ACTIVE_BG
+        tabSell.TextColor3 = TAB_ACTIVE_TC
+        sellPanel.Visible = true
+    elseif tab == "craft" then
+        tabCraft.BackgroundColor3 = TAB_ACTIVE_BG
+        tabCraft.TextColor3 = TAB_ACTIVE_TC
+        craftPanel.Visible = true
+    end
+end
+
+tabFish.Activated:Connect(function() setTab("fish") end)
+tabDraw.Activated:Connect(function() setTab("draw") end)
+tabSell.Activated:Connect(function() setTab("sell") end)
+tabCraft.Activated:Connect(function() setTab("craft") end)
+
+-- 拖动
 local dragCard, dsC, csC = false, nil, nil
 title.InputBegan:Connect(function(i)
     if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
@@ -251,9 +731,17 @@ toggleBtn.InputEnded:Connect(function(i)
     end
 end)
 
-local FE
+-- ========== 远程 ==========
+local FE, FF
 task.spawn(function()
-    FE = RS:WaitForChild("Fishing"):WaitForChild("Remotes"):WaitForChild("FishingEvent")
+    local fishing = RS:WaitForChild("Fishing", 20)
+    if fishing then
+        local remotes = fishing:WaitForChild("Remotes", 20)
+        if remotes then
+            FE = remotes:WaitForChild("FishingEvent", 20)
+            FF = remotes:WaitForChild("FishingFunction", 20)
+        end
+    end
 end)
 
 local function getAFKRemote()
@@ -269,14 +757,57 @@ local function getTF()
     return fish and fish:FindFirstChild("TargetFrame")
 end
 
+local RF_Open, RF_Use, RF_Summon
+task.spawn(function()
+    local RF = RS:WaitForChild("RemoteFunctions", 20)
+    if RF then
+        RF_Open = RF:WaitForChild("OpenCrate", 10)
+        RF_Use = RF:WaitForChild("UseBoost", 10)
+        RF_Summon = RF:WaitForChild("SummonUnits", 10)
+    end
+end)
+
 local function nowTime() return tick() end
 
+-- ========== 钓鱼状态 ==========
 local running = false
 local currentIndex = 0
 local lastHit = 0
 local roundId = 0
 local totalCaught = 0
 local afkOn = false
+local currentSpot = 1
+
+local function getSpotTP()
+    return (currentSpot == 1) and SPOT1_TP or SPOT2_TP
+end
+
+local function getSpotCast()
+    return (currentSpot == 1) and SPOT1_CAST or SPOT2_CAST
+end
+
+local function teleportToSpot()
+    local c = P.Character
+    if not c then return false end
+    local h = c:FindFirstChild("HumanoidRootPart")
+    if not h then return false end
+    h.CFrame = CFrame.new(getSpotTP() + Vector3.new(0, 3, 0))
+    return true
+end
+
+local function teleportToMarket()
+    local c = P.Character
+    if not c then return false end
+    local h = c:FindFirstChild("HumanoidRootPart")
+    if not h then return false end
+    h.CFrame = CFrame.new(MARKET_POS)
+    return true
+end
+
+local function updateSpotLine()
+    spotLine.Text = "钓点" .. currentSpot
+    switchBtn.Text = "切到钓点" .. ((currentSpot == 1) and 2 or 1)
+end
 
 local function updateStat()
     statLine.Text = string.format("蓄力 %.1fs   已钓 %d", HOLD_TIME, totalCaught)
@@ -287,7 +818,7 @@ local function setUI(state)
         dot.BackgroundColor3 = Color3.fromRGB(80, 220, 120)
         statusText.Text = "运行中"
         statusText.TextColor3 = Color3.fromRGB(120, 220, 150)
-        btn.Text = "停止"
+        btn.Text = "停止钓鱼"
         btnGrad.Color = ColorSequence.new{
             ColorSequenceKeypoint.new(0, Color3.fromRGB(210, 90, 90)),
             ColorSequenceKeypoint.new(1, Color3.fromRGB(160, 55, 55)),
@@ -296,7 +827,7 @@ local function setUI(state)
         dot.BackgroundColor3 = Color3.fromRGB(100, 100, 120)
         statusText.Text = "已停止"
         statusText.TextColor3 = Color3.fromRGB(140, 150, 170)
-        btn.Text = "开始"
+        btn.Text = "开始钓鱼"
         btnGrad.Color = ColorSequence.new{
             ColorSequenceKeypoint.new(0, Color3.fromRGB(85, 130, 200)),
             ColorSequenceKeypoint.new(1, Color3.fromRGB(55, 85, 140)),
@@ -312,9 +843,8 @@ local function startRound()
     roundId = roundId + 1
     local myId = roundId
 
-    infoLine.Text = "抛竿中..."
-    -- ★ 使用固定钓鱼坐标
-    FE:FireServer("Cast", {Position = CAST_POS})
+    infoLine.Text = string.format("钓点%d 抛竿中...", currentSpot)
+    FE:FireServer("Cast", {Position = getSpotCast()})
 
     task.delay(30, function()
         if roundId == myId and running then
@@ -329,9 +859,12 @@ local function startFishing()
     roundId = roundId + 1
     currentIndex = 0
     setUI("running")
+
     task.spawn(function()
         if not FE then task.wait(0.5) end
         task.wait(0.3)
+        teleportToSpot()
+        task.wait(0.6)
         startRound()
     end)
 end
@@ -345,14 +878,30 @@ local function stopFishing()
     infoLine.Text = ""
 end
 
-local function doTeleport()
-    local c = P.Character
-    if not c then footLine.Text = "角色不存在" return false end
-    local h = c:FindFirstChild("HumanoidRootPart")
-    if not h then footLine.Text = "找不到 HRP" return false end
-    h.CFrame = CFrame.new(TELEPORT_POS)   -- ★ 用新坐标
-    footLine.Text = "已传送"
-    return true
+local function switchSpot()
+    local wasRunning = running
+
+    if wasRunning then
+        running = false
+        roundId = roundId + 1
+        currentIndex = 0
+        lastHit = 0
+        setUI("stopped")
+    end
+
+    currentSpot = (currentSpot == 1) and 2 or 1
+    footLine.Text = string.format("传送到钓点%d...", currentSpot)
+
+    teleportToSpot()
+    task.wait(0.8)
+    updateSpotLine()
+
+    if wasRunning then
+        task.wait(0.2)
+        startFishing()
+    end
+
+    footLine.Text = "已切换到钓点 " .. currentSpot
 end
 
 local function enableAFK()
@@ -366,7 +915,6 @@ local function enableAFK()
         ColorSequenceKeypoint.new(1, Color3.fromRGB(55, 140, 85)),
     }
     footLine.Text = "AFK 已开启"
-    print("[AFK] Start")
 end
 
 local function disableAFK()
@@ -383,7 +931,6 @@ local function disableAFK()
         ColorSequenceKeypoint.new(1, Color3.fromRGB(45, 75, 120)),
     }
     footLine.Text = "AFK 已关闭"
-    print("[AFK] Stop")
 end
 
 task.spawn(function()
@@ -433,7 +980,7 @@ task.spawn(function()
         task.wait(0.03)
         if running and currentIndex > 0 then
             local tf = getTF()
-            if tf and tf.Visible then
+            if FE and tf and tf.Visible then
                 local cl = tf:FindFirstChild("Click")
                 if cl and cl.Visible and cl.AbsoluteSize.X > 0 then
                     local now = tick()
@@ -450,6 +997,321 @@ task.spawn(function()
     end
 end)
 
+-- ========== 抽奖 ==========
+local drawRunning = false
+local drawCount = 0
+local DRAW_GAP = 0.4
+
+local function updateDrawStat()
+    drawStat.Text = "已抽 " .. drawCount .. " 次"
+end
+
+local function setDrawLoopUI(state)
+    if state == "running" then
+        drawDot.BackgroundColor3 = Color3.fromRGB(80, 220, 120)
+        drawStatus.TextColor3 = Color3.fromRGB(120, 220, 150)
+        drawBtn.Text = "停止循环"
+        drawGrad.Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(210, 90, 90)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(160, 55, 55)),
+        }
+    else
+        drawDot.BackgroundColor3 = Color3.fromRGB(100, 100, 120)
+        drawStatus.TextColor3 = Color3.fromRGB(140, 150, 170)
+        drawBtn.Text = "开始循环"
+        drawGrad.Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(180, 120, 200)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(120, 70, 150)),
+        }
+    end
+end
+
+local function doAction(key)
+    if key == "10MCrate" then
+        if RF_Open then pcall(function() RF_Open:InvokeServer("10MCrate", 6) end) end
+    elseif key == "ScientistCrate" then
+        if RF_Open then pcall(function() RF_Open:InvokeServer("ScientistCrate", 6) end) end
+    elseif key == "PartyCrate" then
+        if RF_Open then pcall(function() RF_Open:InvokeServer("PartyCrate", 6) end) end
+    elseif key == "Luck" then
+        if RF_Use then pcall(function() RF_Use:InvokeServer("Luck") end) end
+    elseif key == "SummonUnits" then
+        if RF_Summon then pcall(function() RF_Summon:InvokeServer(10) end) end
+    end
+end
+
+local function startDraw()
+    if drawRunning then return end
+    if not selectedAction then
+        drawStatus.Text = "请先选一个!"
+        drawStatus.TextColor3 = Color3.fromRGB(255, 120, 120)
+        return
+    end
+
+    drawRunning = true
+    drawCount = 0
+    updateDrawStat()
+    setDrawLoopUI("running")
+    drawStatus.Text = "抽: " .. selectedAction
+    drawStatus.TextColor3 = Color3.fromRGB(120, 220, 150)
+
+    task.spawn(function()
+        while drawRunning do
+            doAction(selectedAction)
+            drawCount = drawCount + 1
+            updateDrawStat()
+            task.wait(DRAW_GAP)
+        end
+        setDrawLoopUI("stopped")
+        if selectedAction then
+            drawStatus.Text = "已选: " .. selectedAction
+            drawStatus.TextColor3 = Color3.fromRGB(120, 220, 150)
+        else
+            drawStatus.Text = "未选择"
+            drawStatus.TextColor3 = Color3.fromRGB(140, 150, 170)
+        end
+    end)
+end
+
+local function stopDraw()
+    drawRunning = false
+    setDrawLoopUI("stopped")
+end
+
+-- ========== 卖鱼 ==========
+-- 路径：_LobbyUI.Fish Staff.Slots Backpack.Backpack.CurrentFrame.Fish.Fish
+local function getFishScrollFrame()
+    local gui = P.PlayerGui:FindFirstChild("_LobbyUI")
+    if not gui then return nil end
+    local fs = gui:FindFirstChild("Fish Staff")
+    if not fs then return nil end
+    local sb = fs:FindFirstChild("Slots Backpack")
+    if not sb then return nil end
+    local bp = sb:FindFirstChild("Backpack")
+    if not bp then return nil end
+    local cf = bp:FindFirstChild("CurrentFrame")
+    if not cf then return nil end
+    local ff = cf:FindFirstChild("Fish")
+    if not ff then return nil end
+    return ff:FindFirstChild("Fish")
+end
+
+local function isSellFish(name)
+    for _, f in ipairs(SELL_FISH) do
+        if f == name then return true end
+    end
+    return false
+end
+
+local function scanInventory()
+    local sf = getFishScrollFrame()
+    if not sf then return {} end
+
+    local list = {}
+    for _, child in ipairs(sf:GetChildren()) do
+        if child:IsA("Frame")
+        and child.Name ~= "Template"
+        and child.Name ~= "_dont touch" then
+
+            local move = child:FindFirstChild("Move")
+            if move then
+                local titleObj = move:FindFirstChild("_Title")
+                if titleObj and titleObj:IsA("TextLabel") then
+                    local txt = titleObj.Text or ""
+                    local w = tonumber(txt:match("([%d%.]+)"))
+                    if w then
+                        table.insert(list, {
+                            name = child.Name,
+                            weight = w,
+                        })
+                    end
+                end
+            end
+        end
+    end
+    return list
+end
+
+local selling = false
+
+local function sellAll()
+    if selling then return end
+    selling = true
+
+    sellDot.BackgroundColor3 = Color3.fromRGB(255, 200, 80)
+    sellStatus.Text = "传送到市场..."
+    sellStatus.TextColor3 = Color3.fromRGB(255, 200, 120)
+    sellInfo.Text = ""
+
+    if not FF then
+        sellStatus.Text = "没找到 FishingFunction"
+        sellStatus.TextColor3 = Color3.fromRGB(255, 120, 120)
+        selling = false
+        return
+    end
+
+    task.spawn(function()
+        -- ★ 先传送到市场
+        teleportToMarket()
+        task.wait(1)
+
+        sellStatus.Text = "扫描中..."
+        local items = scanInventory()
+
+        local total = 0
+        local counts = {}
+        local skipped = 0
+
+        sellStatus.Text = "卖出中..."
+        for _, item in ipairs(items) do
+            if isSellFish(item.name) then
+                pcall(function()
+                    FF:InvokeServer("SellFish", {
+                        Fish = item.name,
+                        Weight = item.weight,
+                        Amount = 1
+                    })
+                end)
+                total = total + 1
+                counts[item.name] = (counts[item.name] or 0) + 1
+                task.wait(0.08)
+            else
+                skipped = skipped + 1
+            end
+        end
+
+        if total == 0 then
+            sellStatus.Text = "没有可卖的鱼"
+            sellStatus.TextColor3 = Color3.fromRGB(255, 200, 120)
+            sellInfo.Text = string.format("扫描到 %d 条, 都不在售卖列表", #items)
+        else
+            sellStatus.Text = "已卖 " .. total .. " 条"
+            sellStatus.TextColor3 = Color3.fromRGB(120, 220, 150)
+            sellDot.BackgroundColor3 = Color3.fromRGB(80, 220, 120)
+
+            local lines = {}
+            for name, cnt in pairs(counts) do
+                table.insert(lines, string.format("%s ×%d", name, cnt))
+            end
+            local show = table.concat(lines, "\n")
+            if skipped > 0 then
+                show = show .. string.format("\n(跳过 %d 条非列表鱼)", skipped)
+            end
+            if #show > 250 then show = show:sub(1, 250) .. "\n..." end
+            sellInfo.Text = show
+        end
+
+        selling = false
+    end)
+end
+
+local function scanOnly()
+    sellStatus.Text = "扫描中..."
+    sellStatus.TextColor3 = Color3.fromRGB(140, 180, 220)
+    task.spawn(function()
+        local items = scanInventory()
+        if #items == 0 then
+            sellStatus.Text = "没扫到鱼"
+            sellStatus.TextColor3 = Color3.fromRGB(255, 200, 120)
+            sellInfo.Text = "可能背包没加载"
+            return
+        end
+
+        local counts = {}
+        for _, it in ipairs(items) do
+            counts[it.name] = (counts[it.name] or 0) + 1
+        end
+
+        local lines = {}
+        local sellable = 0
+        for name, cnt in pairs(counts) do
+            local tag = isSellFish(name) and "✓" or "✗"
+            table.insert(lines, string.format("%s %s ×%d", tag, name, cnt))
+            if isSellFish(name) then sellable = sellable + cnt end
+        end
+
+        sellStatus.Text = string.format("总 %d 条 / 可卖 %d", #items, sellable)
+        sellStatus.TextColor3 = Color3.fromRGB(120, 220, 150)
+        sellInfo.Text = table.concat(lines, "\n")
+    end)
+end
+
+-- ========== 合成 ==========
+local crafting = false
+
+local function startCraft()
+    if crafting then return end
+    if not FF then
+        craftStatus.Text = "没找到 FishingFunction"
+        craftStatus.TextColor3 = Color3.fromRGB(255, 120, 120)
+        return
+    end
+
+    local recipe = tonumber(recipeBox.Text)
+    local count = tonumber(countBox.Text)
+
+    if not recipe then
+        craftStatus.Text = "配方编号无效"
+        craftStatus.TextColor3 = Color3.fromRGB(255, 120, 120)
+        return
+    end
+    if not count or count <= 0 then
+        craftStatus.Text = "合成次数无效"
+        craftStatus.TextColor3 = Color3.fromRGB(255, 120, 120)
+        return
+    end
+
+    crafting = true
+    craftDot.BackgroundColor3 = Color3.fromRGB(255, 200, 80)
+    craftStatus.Text = "传送到市场..."
+    craftStatus.TextColor3 = Color3.fromRGB(255, 200, 120)
+    craftInfo.Text = ""
+
+    task.spawn(function()
+        -- ★ 先传送到市场
+        teleportToMarket()
+        task.wait(1)
+
+        local done = 0
+        for i = 1, count do
+            if not crafting then break end
+
+            pcall(function()
+                FF:InvokeServer("Craft", {Recipe = recipe})
+            end)
+
+            done = done + 1
+            craftStatus.Text = string.format("合成 %d/%d (配方%d)", done, count, recipe)
+            craftStatus.TextColor3 = Color3.fromRGB(120, 220, 150)
+            craftInfo.Text = string.format("配方: %d  目标: %d", recipe, count)
+
+            task.wait(0.35)
+        end
+
+        if done >= count then
+            craftStatus.Text = "合成完成 " .. done .. " 次"
+            craftStatus.TextColor3 = Color3.fromRGB(120, 220, 150)
+            craftDot.BackgroundColor3 = Color3.fromRGB(80, 220, 120)
+        else
+            craftStatus.Text = "已停止 (完成 " .. done .. ")"
+            craftStatus.TextColor3 = Color3.fromRGB(255, 200, 120)
+        end
+
+        crafting = false
+    end)
+end
+
+local function stopCraft()
+    crafting = false
+    craftStatus.Text = "已停止"
+    craftStatus.TextColor3 = Color3.fromRGB(140, 150, 170)
+end
+
+-- ========== 按钮绑定 ==========
+drawBtn.Activated:Connect(function()
+    if drawRunning then stopDraw() else startDraw() end
+end)
+
 btn.Activated:Connect(function()
     if running then stopFishing() else startFishing() end
 end)
@@ -458,24 +1320,37 @@ afkBtn.Activated:Connect(function()
     if afkOn then disableAFK() else enableAFK() end
 end)
 
-tpBtn.Activated:Connect(function()
-    doTeleport()
+switchBtn.Activated:Connect(function()
+    switchSpot()
 end)
 
--- 自启动
+tpBtn.Activated:Connect(function()
+    teleportToSpot()
+    footLine.Text = "已传送到钓点" .. currentSpot
+end)
+
+sellBtn.Activated:Connect(function()
+    sellAll()
+end)
+
+scanBtn.Activated:Connect(function()
+    scanOnly()
+end)
+
+craftBtn.Activated:Connect(function()
+    if crafting then stopCraft() else startCraft() end
+end)
+
+teleportMarketBtn.Activated:Connect(function()
+    teleportToMarket()
+    craftStatus.Text = "已传送到市场"
+    craftStatus.TextColor3 = Color3.fromRGB(120, 220, 150)
+end)
+
+-- ========== 自启动 ==========
 task.spawn(function()
     if not P.Character then P.CharacterAdded:Wait() end
     task.wait(1)
-
-    for i = 1, 5 do
-        local h = P.Character and P.Character:FindFirstChild("HumanoidRootPart")
-        if h then
-            h.CFrame = CFrame.new(TELEPORT_POS)   -- ★ 用新坐标
-            footLine.Text = "启动传送完成"
-            break
-        end
-        task.wait(0.5)
-    end
 
     task.wait(0.3)
     enableAFK()
@@ -485,7 +1360,7 @@ task.spawn(function()
         startFishing()
     end
 
-    print("[自启动] 传送 + AFK + 钓鱼 已全部启动")
+    print("[自启动] AFK + 钓鱼")
 end)
 
 print("OK")
