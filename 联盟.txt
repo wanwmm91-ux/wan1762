@@ -15,8 +15,17 @@ local SPOT1_CAST = Vector3.new(-6901.70263671875, 15.953121185302734, 1066.57971
 local SPOT2_TP   = Vector3.new(-7033.3, 27.5, 1026.7)
 local SPOT2_CAST = Vector3.new(-7042.85888671875, 20.706336975097656, 1041.733642578125)
 
--- ★ 市场坐标（卖鱼/合成前传送）
+-- ★ 市场坐标
 local MARKET_POS = Vector3.new(-6209.0, 26.4, 1543.5)
+
+-- ★ 自动循环间隔
+local AUTO_SWITCH_SPOT_INTERVAL = 600   -- 每 10 分钟切钓点
+local AUTO_CRAFT_SELL_INTERVAL = 600    -- 每 10 分钟合成+卖
+local AUTO_CRAFT_SELL_START    = 300    -- 启动 5 分钟后开始第一次合成卖
+
+-- ★ 游戏时间奖励
+local CLAIM_ID = 82938
+local CLAIM_LEVELS = {1, 2, 3, 4, 5, 6, 7, 8, 9}
 
 -- ★ 只卖这些鱼
 local SELL_FISH = {
@@ -67,8 +76,8 @@ toggleGrad.Rotation = 90
 toggleGrad.Parent = toggleBtn
 
 local card = Instance.new("Frame")
-card.Size = UDim2.new(0, 230, 0, 280)
-card.Position = UDim2.new(0.66, 0, 0.28, 0)
+card.Size = UDim2.new(0, 230, 0, 380)
+card.Position = UDim2.new(0.66, 0, 0.20, 0)
 card.BackgroundColor3 = Color3.fromRGB(25, 28, 35)
 card.BorderSizePixel = 0
 card.Visible = false
@@ -248,9 +257,50 @@ tpGrad.Color = ColorSequence.new{
 tpGrad.Rotation = 90
 tpGrad.Parent = tpBtn
 
+local claimBtn = Instance.new("TextButton")
+claimBtn.Size = UDim2.new(1, 0, 0, 26)
+claimBtn.Position = UDim2.new(0, 0, 0, 122)
+claimBtn.BackgroundColor3 = Color3.fromRGB(80, 70, 130)
+claimBtn.Text = "领取游戏时间奖励"
+claimBtn.TextColor3 = Color3.fromRGB(230, 220, 255)
+claimBtn.TextSize = 11
+claimBtn.Font = Enum.Font.GothamBold
+claimBtn.AutoButtonColor = false
+claimBtn.ZIndex = 52
+claimBtn.Parent = fishPanel
+Instance.new("UICorner", claimBtn).CornerRadius = UDim.new(0, 6)
+
+-- ★ 自动切钓点开关（放在钓鱼面板）
+local autoSwitchBtn = Instance.new("TextButton")
+autoSwitchBtn.Size = UDim2.new(1, 0, 0, 26)
+autoSwitchBtn.Position = UDim2.new(0, 0, 0, 152)
+autoSwitchBtn.BackgroundColor3 = Color3.fromRGB(60, 80, 70)
+autoSwitchBtn.Text = "自动切钓点: 关"
+autoSwitchBtn.TextColor3 = Color3.fromRGB(200, 240, 220)
+autoSwitchBtn.TextSize = 11
+autoSwitchBtn.Font = Enum.Font.GothamBold
+autoSwitchBtn.AutoButtonColor = false
+autoSwitchBtn.ZIndex = 52
+autoSwitchBtn.Parent = fishPanel
+Instance.new("UICorner", autoSwitchBtn).CornerRadius = UDim.new(0, 6)
+
+-- ★ 自动合成卖开关（也放在钓鱼面板，方便操作）
+local autoCraftSellBtn = Instance.new("TextButton")
+autoCraftSellBtn.Size = UDim2.new(1, 0, 0, 26)
+autoCraftSellBtn.Position = UDim2.new(0, 0, 0, 182)
+autoCraftSellBtn.BackgroundColor3 = Color3.fromRGB(60, 80, 70)
+autoCraftSellBtn.Text = "自动合成卖: 关"
+autoCraftSellBtn.TextColor3 = Color3.fromRGB(200, 240, 220)
+autoCraftSellBtn.TextSize = 11
+autoCraftSellBtn.Font = Enum.Font.GothamBold
+autoCraftSellBtn.AutoButtonColor = false
+autoCraftSellBtn.ZIndex = 52
+autoCraftSellBtn.Parent = fishPanel
+Instance.new("UICorner", autoCraftSellBtn).CornerRadius = UDim.new(0, 6)
+
 local infoLine = Instance.new("TextLabel")
 infoLine.Size = UDim2.new(1, 0, 0, 14)
-infoLine.Position = UDim2.new(0, 0, 0, 122)
+infoLine.Position = UDim2.new(0, 0, 0, 214)
 infoLine.BackgroundTransparency = 1
 infoLine.Text = ""
 infoLine.TextColor3 = Color3.fromRGB(120, 200, 140)
@@ -262,9 +312,9 @@ infoLine.Parent = fishPanel
 
 local spotLine = Instance.new("TextLabel")
 spotLine.Size = UDim2.new(1, 0, 0, 14)
-spotLine.Position = UDim2.new(0, 0, 0, 138)
+spotLine.Position = UDim2.new(0, 0, 0, 230)
 spotLine.BackgroundTransparency = 1
-spotLine.Text = "钓点1"
+spotLine.Text = "钓点1  下次切 10:00"
 spotLine.TextColor3 = Color3.fromRGB(140, 180, 220)
 spotLine.TextSize = 11
 spotLine.Font = Enum.Font.Code
@@ -274,7 +324,7 @@ spotLine.Parent = fishPanel
 
 local statLine = Instance.new("TextLabel")
 statLine.Size = UDim2.new(1, 0, 0, 14)
-statLine.Position = UDim2.new(0, 0, 0, 154)
+statLine.Position = UDim2.new(0, 0, 0, 246)
 statLine.BackgroundTransparency = 1
 statLine.Text = string.format("蓄力 %.1fs   已钓 0", HOLD_TIME)
 statLine.TextColor3 = Color3.fromRGB(100, 110, 130)
@@ -286,7 +336,7 @@ statLine.Parent = fishPanel
 
 local footLine = Instance.new("TextLabel")
 footLine.Size = UDim2.new(1, 0, 0, 14)
-footLine.Position = UDim2.new(0, 0, 0, 170)
+footLine.Position = UDim2.new(0, 0, 0, 262)
 footLine.BackgroundTransparency = 1
 footLine.Text = ""
 footLine.TextColor3 = Color3.fromRGB(255, 200, 120)
@@ -327,12 +377,12 @@ drawStatus.ZIndex = 52
 drawStatus.Parent = drawPanel
 
 local drawBtn = Instance.new("TextButton")
-drawBtn.Size = UDim2.new(1, 0, 0, 34)
+drawBtn.Size = UDim2.new(1, 0, 0, 30)
 drawBtn.Position = UDim2.new(0, 0, 0, 18)
 drawBtn.BackgroundColor3 = Color3.fromRGB(60, 80, 130)
 drawBtn.Text = "开始循环"
 drawBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-drawBtn.TextSize = 13
+drawBtn.TextSize = 12
 drawBtn.Font = Enum.Font.GothamBold
 drawBtn.AutoButtonColor = false
 drawBtn.ZIndex = 52
@@ -349,12 +399,12 @@ drawGrad.Parent = drawBtn
 
 local function makeDrawOptionBtn(text, y, key)
     local b = Instance.new("TextButton")
-    b.Size = UDim2.new(1, 0, 0, 26)
+    b.Size = UDim2.new(1, 0, 0, 22)
     b.Position = UDim2.new(0, 0, 0, y)
     b.BackgroundColor3 = Color3.fromRGB(40, 50, 70)
     b.Text = text
     b.TextColor3 = Color3.fromRGB(200, 215, 235)
-    b.TextSize = 11
+    b.TextSize = 10
     b.Font = Enum.Font.GothamBold
     b.AutoButtonColor = false
     b.ZIndex = 52
@@ -364,11 +414,13 @@ local function makeDrawOptionBtn(text, y, key)
     return b
 end
 
-local opt10M    = makeDrawOptionBtn("10MCrate ×6", 60, "10MCrate")
-local optSci    = makeDrawOptionBtn("ScientistCrate ×6", 88, "ScientistCrate")
-local optParty  = makeDrawOptionBtn("PartyCrate ×6", 116, "PartyCrate")
-local optLuck   = makeDrawOptionBtn("Luck Boost", 144, "Luck")
+local opt10M    = makeDrawOptionBtn("10MCrate ×6", 52, "10MCrate")
+local optSci    = makeDrawOptionBtn("ScientistCrate ×6", 76, "ScientistCrate")
+local optParty  = makeDrawOptionBtn("PartyCrate ×6", 100, "PartyCrate")
+local optFishC  = makeDrawOptionBtn("FishCrate ×6", 124, "FishCrate")
+local optLuck   = makeDrawOptionBtn("Luck Boost", 148, "Luck")
 local optSummon = makeDrawOptionBtn("召唤单位 ×10", 172, "SummonUnits")
+local optSpin   = makeDrawOptionBtn("Spin Wheel", 196, "SpinWheel")
 
 local OPTION_DEFAULT_BG = Color3.fromRGB(40, 50, 70)
 local OPTION_SELECTED_BG = Color3.fromRGB(70, 150, 200)
@@ -376,7 +428,7 @@ local OPTION_DEFAULT_TC = Color3.fromRGB(200, 215, 235)
 local OPTION_SELECTED_TC = Color3.fromRGB(255, 255, 255)
 
 local selectedAction = nil
-local allOptionBtns = {opt10M, optSci, optParty, optLuck, optSummon}
+local allOptionBtns = {opt10M, optSci, optParty, optFishC, optLuck, optSummon, optSpin}
 
 local function clearSelection()
     selectedAction = nil
@@ -414,15 +466,13 @@ local function bindOption(btn)
     end)
 end
 
-bindOption(opt10M)
-bindOption(optSci)
-bindOption(optParty)
-bindOption(optLuck)
-bindOption(optSummon)
+for _, ob in ipairs(allOptionBtns) do
+    bindOption(ob)
+end
 
 local drawStat = Instance.new("TextLabel")
 drawStat.Size = UDim2.new(1, 0, 0, 14)
-drawStat.Position = UDim2.new(0, 0, 0, 202)
+drawStat.Position = UDim2.new(0, 0, 0, 224)
 drawStat.BackgroundTransparency = 1
 drawStat.Text = "已抽 0 次"
 drawStat.TextColor3 = Color3.fromRGB(100, 110, 130)
@@ -463,7 +513,7 @@ sellStatus.ZIndex = 52
 sellStatus.Parent = sellPanel
 
 local sellBtn = Instance.new("TextButton")
-sellBtn.Size = UDim2.new(1, 0, 0, 42)
+sellBtn.Size = UDim2.new(1, 0, 0, 40)
 sellBtn.Position = UDim2.new(0, 0, 0, 22)
 sellBtn.BackgroundColor3 = Color3.fromRGB(80, 130, 90)
 sellBtn.Text = "一键卖出全部鱼"
@@ -485,7 +535,7 @@ sellGrad.Parent = sellBtn
 
 local scanBtn = Instance.new("TextButton")
 scanBtn.Size = UDim2.new(1, 0, 0, 26)
-scanBtn.Position = UDim2.new(0, 0, 0, 70)
+scanBtn.Position = UDim2.new(0, 0, 0, 68)
 scanBtn.BackgroundColor3 = Color3.fromRGB(45, 60, 90)
 scanBtn.Text = "扫描库存"
 scanBtn.TextColor3 = Color3.fromRGB(220, 230, 250)
@@ -498,7 +548,7 @@ Instance.new("UICorner", scanBtn).CornerRadius = UDim.new(0, 6)
 
 local sellInfo = Instance.new("TextLabel")
 sellInfo.Size = UDim2.new(1, 0, 1, -100)
-sellInfo.Position = UDim2.new(0, 0, 0, 102)
+sellInfo.Position = UDim2.new(0, 0, 0, 100)
 sellInfo.BackgroundTransparency = 1
 sellInfo.Text = ""
 sellInfo.TextColor3 = Color3.fromRGB(120, 200, 140)
@@ -540,7 +590,6 @@ craftStatus.TextXAlignment = Enum.TextXAlignment.Left
 craftStatus.ZIndex = 52
 craftStatus.Parent = craftPanel
 
--- Recipe 输入
 local recipeLabel = Instance.new("TextLabel")
 recipeLabel.Size = UDim2.new(0, 70, 0, 26)
 recipeLabel.Position = UDim2.new(0, 0, 0, 20)
@@ -567,7 +616,6 @@ recipeBox.ZIndex = 52
 recipeBox.Parent = craftPanel
 Instance.new("UICorner", recipeBox).CornerRadius = UDim.new(0, 6)
 
--- 数量输入
 local countLabel = Instance.new("TextLabel")
 countLabel.Size = UDim2.new(0, 70, 0, 26)
 countLabel.Position = UDim2.new(0, 0, 0, 52)
@@ -757,17 +805,38 @@ local function getTF()
     return fish and fish:FindFirstChild("TargetFrame")
 end
 
-local RF_Open, RF_Use, RF_Summon
+local RF_Open, RF_Use, RF_Summon, RF_Spin, RF_Claim
 task.spawn(function()
     local RF = RS:WaitForChild("RemoteFunctions", 20)
     if RF then
-        RF_Open = RF:WaitForChild("OpenCrate", 10)
-        RF_Use = RF:WaitForChild("UseBoost", 10)
+        RF_Open   = RF:WaitForChild("OpenCrate", 10)
+        RF_Use    = RF:WaitForChild("UseBoost", 10)
         RF_Summon = RF:WaitForChild("SummonUnits", 10)
+        RF_Spin   = RF:WaitForChild("SpinWheel", 10)
+        RF_Claim  = RF:WaitForChild("ClaimPlaytimeGift", 10)
     end
 end)
 
 local function nowTime() return tick() end
+
+-- ========== 领取奖励 ==========
+local function claimPlaytimeGifts()
+    if not RF_Claim then
+        footLine.Text = "找不到 ClaimPlaytimeGift"
+        return
+    end
+    task.spawn(function()
+        local got = 0
+        for _, lvl in ipairs(CLAIM_LEVELS) do
+            local ok = pcall(function()
+                RF_Claim:InvokeServer(lvl, CLAIM_ID)
+            end)
+            if ok then got = got + 1 end
+            task.wait(0.15)
+        end
+        footLine.Text = "已尝试领 " .. got .. " 个时间奖励"
+    end)
+end
 
 -- ========== 钓鱼状态 ==========
 local running = false
@@ -777,6 +846,12 @@ local roundId = 0
 local totalCaught = 0
 local afkOn = false
 local currentSpot = 1
+
+local autoCraftSellOn = false
+local autoSwitchSpotOn = false
+
+-- ★ 记录上次切钓点时间 + 下次切
+local lastAutoSwitch = tick()
 
 local function getSpotTP()
     return (currentSpot == 1) and SPOT1_TP or SPOT2_TP
@@ -805,7 +880,10 @@ local function teleportToMarket()
 end
 
 local function updateSpotLine()
-    spotLine.Text = "钓点" .. currentSpot
+    local remain = math.max(0, AUTO_SWITCH_SPOT_INTERVAL - (tick() - lastAutoSwitch))
+    local m = math.floor(remain / 60)
+    local s = math.floor(remain % 60)
+    spotLine.Text = string.format("钓点%d  下次切 %d:%02d", currentSpot, m, s)
     switchBtn.Text = "切到钓点" .. ((currentSpot == 1) and 2 or 1)
 end
 
@@ -902,6 +980,7 @@ local function switchSpot()
     end
 
     footLine.Text = "已切换到钓点 " .. currentSpot
+    lastAutoSwitch = tick()
 end
 
 local function enableAFK()
@@ -997,6 +1076,16 @@ task.spawn(function()
     end
 end)
 
+-- 更新 spotLine 倒计时（每 0.5 秒刷一次）
+task.spawn(function()
+    while true do
+        task.wait(0.5)
+        if autoSwitchSpotOn then
+            updateSpotLine()
+        end
+    end
+end)
+
 -- ========== 抽奖 ==========
 local drawRunning = false
 local drawCount = 0
@@ -1033,10 +1122,14 @@ local function doAction(key)
         if RF_Open then pcall(function() RF_Open:InvokeServer("ScientistCrate", 6) end) end
     elseif key == "PartyCrate" then
         if RF_Open then pcall(function() RF_Open:InvokeServer("PartyCrate", 6) end) end
+    elseif key == "FishCrate" then
+        if RF_Open then pcall(function() RF_Open:InvokeServer("FishCrate", 6) end) end
     elseif key == "Luck" then
         if RF_Use then pcall(function() RF_Use:InvokeServer("Luck") end) end
     elseif key == "SummonUnits" then
         if RF_Summon then pcall(function() RF_Summon:InvokeServer(10) end) end
+    elseif key == "SpinWheel" then
+        if RF_Spin then pcall(function() RF_Spin:InvokeServer() end) end
     end
 end
 
@@ -1079,7 +1172,6 @@ local function stopDraw()
 end
 
 -- ========== 卖鱼 ==========
--- 路径：_LobbyUI.Fish Staff.Slots Backpack.Backpack.CurrentFrame.Fish.Fish
 local function getFishScrollFrame()
     local gui = P.PlayerGui:FindFirstChild("_LobbyUI")
     if not gui then return nil end
@@ -1151,7 +1243,6 @@ local function sellAll()
     end
 
     task.spawn(function()
-        -- ★ 先传送到市场
         teleportToMarket()
         task.wait(1)
 
@@ -1268,7 +1359,6 @@ local function startCraft()
     craftInfo.Text = ""
 
     task.spawn(function()
-        -- ★ 先传送到市场
         teleportToMarket()
         task.wait(1)
 
@@ -1307,6 +1397,90 @@ local function stopCraft()
     craftStatus.TextColor3 = Color3.fromRGB(140, 150, 170)
 end
 
+-- ========== 自动合成卖 ==========
+local function autoCraftSellOnce()
+    if not FF then return end
+
+    local wasRunning = running
+
+    if wasRunning then
+        running = false
+        roundId = roundId + 1
+        currentIndex = 0
+        setUI("stopped")
+    end
+
+    teleportToMarket()
+    task.wait(1)
+
+    local recipe = tonumber(recipeBox.Text) or 2
+    local count = tonumber(countBox.Text) or 10
+    craftStatus.Text = "自动合成中..."
+    craftStatus.TextColor3 = Color3.fromRGB(255, 200, 120)
+    for i = 1, count do
+        if not autoCraftSellOn then break end
+        pcall(function()
+            FF:InvokeServer("Craft", {Recipe = recipe})
+        end)
+        craftStatus.Text = string.format("自动合成 %d/%d", i, count)
+        task.wait(0.35)
+    end
+
+    task.wait(0.5)
+    craftStatus.Text = "自动卖鱼中..."
+    local items = scanInventory()
+    local sold = 0
+    for _, item in ipairs(items) do
+        if not autoCraftSellOn then break end
+        if isSellFish(item.name) then
+            pcall(function()
+                FF:InvokeServer("SellFish", {
+                    Fish = item.name,
+                    Weight = item.weight,
+                    Amount = 1
+                })
+            end)
+            sold = sold + 1
+            task.wait(0.08)
+        end
+    end
+
+    craftStatus.Text = string.format("自动完成: 合%d 卖%d", count, sold)
+    craftStatus.TextColor3 = Color3.fromRGB(120, 220, 150)
+
+    teleportToSpot()
+    task.wait(0.8)
+
+    if wasRunning then
+        startFishing()
+    end
+end
+
+task.spawn(function()
+    task.wait(AUTO_CRAFT_SELL_START)
+    while true do
+        if autoCraftSellOn then
+            autoCraftSellOnce()
+        end
+        task.wait(AUTO_CRAFT_SELL_INTERVAL)
+    end
+end)
+
+-- ========== 自动切钓点 ==========
+-- 每 1 秒检查一次，到时间就切
+task.spawn(function()
+    while true do
+        task.wait(1)
+        if autoSwitchSpotOn then
+            local elapsed = tick() - lastAutoSwitch
+            if elapsed >= AUTO_SWITCH_SPOT_INTERVAL then
+                footLine.Text = "自动切钓点..."
+                switchSpot()
+            end
+        end
+    end
+end)
+
 -- ========== 按钮绑定 ==========
 drawBtn.Activated:Connect(function()
     if drawRunning then stopDraw() else startDraw() end
@@ -1329,6 +1503,10 @@ tpBtn.Activated:Connect(function()
     footLine.Text = "已传送到钓点" .. currentSpot
 end)
 
+claimBtn.Activated:Connect(function()
+    claimPlaytimeGifts()
+end)
+
 sellBtn.Activated:Connect(function()
     sellAll()
 end)
@@ -1347,12 +1525,45 @@ teleportMarketBtn.Activated:Connect(function()
     craftStatus.TextColor3 = Color3.fromRGB(120, 220, 150)
 end)
 
+-- ★ 自动切钓点开关
+autoSwitchBtn.Activated:Connect(function()
+    autoSwitchSpotOn = not autoSwitchSpotOn
+    if autoSwitchSpotOn then
+        autoSwitchBtn.Text = "自动切钓点: 开"
+        autoSwitchBtn.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
+        lastAutoSwitch = tick()   -- 从此刻开始计时
+        updateSpotLine()
+        footLine.Text = "自动切钓点已开启"
+    else
+        autoSwitchBtn.Text = "自动切钓点: 关"
+        autoSwitchBtn.BackgroundColor3 = Color3.fromRGB(60, 80, 70)
+        footLine.Text = "自动切钓点已关闭"
+    end
+end)
+
+-- ★ 自动合成卖开关
+autoCraftSellBtn.Activated:Connect(function()
+    autoCraftSellOn = not autoCraftSellOn
+    if autoCraftSellOn then
+        autoCraftSellBtn.Text = "自动合成卖: 开"
+        autoCraftSellBtn.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
+        footLine.Text = "自动合成卖已开启"
+    else
+        autoCraftSellBtn.Text = "自动合成卖: 关"
+        autoCraftSellBtn.BackgroundColor3 = Color3.fromRGB(60, 80, 70)
+        footLine.Text = "自动合成卖已关闭"
+    end
+end)
+
 -- ========== 自启动 ==========
 task.spawn(function()
     if not P.Character then P.CharacterAdded:Wait() end
     task.wait(1)
 
     task.wait(0.3)
+    claimPlaytimeGifts()
+
+    task.wait(0.5)
     enableAFK()
 
     if AUTO_START then
@@ -1360,7 +1571,18 @@ task.spawn(function()
         startFishing()
     end
 
-    print("[自启动] AFK + 钓鱼")
+    -- 默认开启两个自动
+    autoCraftSellOn = true
+    autoCraftSellBtn.Text = "自动合成卖: 开"
+    autoCraftSellBtn.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
+
+    autoSwitchSpotOn = true
+    autoSwitchBtn.Text = "自动切钓点: 开"
+    autoSwitchBtn.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
+    lastAutoSwitch = tick()
+    updateSpotLine()
+
+    print("[自启动] 奖励 + AFK + 钓鱼 + 自动循环")
 end)
 
 print("OK")
